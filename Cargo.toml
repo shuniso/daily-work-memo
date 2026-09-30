@@ -1,9 +1,10 @@
 [package]
-name = "daily-work-memo"
+name = "tsuratsura"
 version = "0.1.0"
 edition = "2024"
 rust-version = "1.88"
-description = "今日の1枚のプレーンテキスト業務メモ"
+description = "つらつら — 1日の仕事を、つらつら書く。今日の1枚のプレーンテキスト業務メモ"
+license = "MIT"
 publish = false
 
 [dependencies]

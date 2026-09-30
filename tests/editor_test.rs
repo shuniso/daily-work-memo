@@ -1,6 +1,6 @@
 use iced::widget::text_editor::{Action, Content, Edit, Motion};
 
-use daily_work_memo::editor::{History, insert_entry};
+use tsuratsura::editor::{History, insert_entry};
 
 fn type_str(content: &mut Content, history: &mut History, s: &str) {
     for c in s.chars() {

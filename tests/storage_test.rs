@@ -3,7 +3,7 @@ use std::path::{Path, PathBuf};
 
 use chrono::NaiveDate;
 
-use daily_work_memo::storage::{daily_path, normalize_newlines, open_daily, save_atomic};
+use tsuratsura::storage::{daily_path, normalize_newlines, open_daily, save_atomic};
 
 fn temp_dir(name: &str) -> PathBuf {
     let dir = std::env::temp_dir().join(format!("dwm-storage-{name}-{}", std::process::id()));

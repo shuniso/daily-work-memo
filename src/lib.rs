@@ -1,4 +1,4 @@
-//! Daily Work Memo: 今日の1枚のプレーンテキストメモ帳。
+//! つらつら (tsuratsura): 今日の1枚のプレーンテキストメモ帳。
 
 pub mod app;
 pub mod config;

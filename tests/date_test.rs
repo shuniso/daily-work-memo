@@ -1,6 +1,6 @@
 use chrono::NaiveDate;
 
-use daily_work_memo::date::needs_rollover;
+use tsuratsura::date::needs_rollover;
 
 fn d(y: i32, m: u32, day: u32) -> NaiveDate {
     NaiveDate::from_ymd_opt(y, m, day).unwrap()

@@ -398,19 +398,6 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "f27ae1dd37df86211c42e150270f82743308803d90a6f6e6651cd730d5e1732f"
 
 [[package]]
-name = "daily-work-memo"
-version = "0.1.0"
-dependencies = [
- "atomic-write-file",
- "chrono",
- "directories",
- "iced",
- "libc",
- "serde",
- "toml",
-]
-
-[[package]]
 name = "directories"
 version = "6.0.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -2422,6 +2409,19 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "db97caf9d906fbde555dd62fa95ddba9eecfd14cb388e4f491a66d74cd5fb79a"
 dependencies = [
  "once_cell",
+]
+
+[[package]]
+name = "tsuratsura"
+version = "0.1.0"
+dependencies = [
+ "atomic-write-file",
+ "chrono",
+ "directories",
+ "iced",
+ "libc",
+ "serde",
+ "toml",
 ]
 
 [[package]]

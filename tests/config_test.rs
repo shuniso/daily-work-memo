@@ -1,7 +1,7 @@
 use std::fs;
 use std::path::PathBuf;
 
-use daily_work_memo::config::{self, Config, ConfigError, DEFAULT_CONFIG_TOML};
+use tsuratsura::config::{self, Config, ConfigError, DEFAULT_CONFIG_TOML};
 
 fn temp_dir(name: &str) -> PathBuf {
     let dir = std::env::temp_dir().join(format!("dwm-config-{name}-{}", std::process::id()));

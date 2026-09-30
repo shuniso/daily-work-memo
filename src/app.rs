@@ -118,7 +118,7 @@ impl App {
     }
 
     pub fn title(&self) -> String {
-        format!("Daily Work Memo — {}", self.active_date.format("%Y-%m-%d"))
+        format!("つらつら — {}", self.active_date.format("%Y-%m-%d"))
     }
 
     fn is_dirty(&self) -> bool {

@@ -22,8 +22,8 @@ jobs:
       - run: cargo build --release
       - uses: actions/upload-artifact@v4
         with:
-          name: daily-work-memo-${{ matrix.os }}
+          name: tsuratsura-${{ matrix.os }}
           path: |
-            target/release/daily-work-memo
-            target/release/daily-work-memo.exe
+            target/release/tsuratsura
+            target/release/tsuratsura.exe
           if-no-files-found: ignore

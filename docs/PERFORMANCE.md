@@ -33,7 +33,7 @@
 - tiny-skia（CPUレンダラ）はカーソル点滅の再描画で数%の CPU を使う。wgpu が使えない環境でのみのフォールバックとして残す。
 - アイドル時は 0.1〜0.2 %。常時 polling はしていない（カーソル点滅の再描画のみ）。
 
-## Release candidate（本体 `daily-work-memo`）
+## Release candidate（本体 `tsuratsura`）
 
 | 条件 | RSS | アイドル CPU |
 |---|---:|---:|

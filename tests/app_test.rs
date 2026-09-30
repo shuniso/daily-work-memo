@@ -4,8 +4,8 @@ use std::path::PathBuf;
 use chrono::NaiveDate;
 use iced::widget::text_editor::{Action, Edit};
 
-use daily_work_memo::app::{App, Message};
-use daily_work_memo::storage::daily_path;
+use tsuratsura::app::{App, Message};
+use tsuratsura::storage::daily_path;
 
 fn temp_dir(name: &str) -> PathBuf {
     let dir = std::env::temp_dir().join(format!("dwm-app-{name}-{}", std::process::id()));

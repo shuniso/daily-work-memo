@@ -1,6 +1,6 @@
 use chrono::{NaiveDate, NaiveDateTime};
 
-use daily_work_memo::entry::{EntryType, entry_text, expand, plan_insertion};
+use tsuratsura::entry::{EntryType, entry_text, expand, plan_insertion};
 
 fn now() -> NaiveDateTime {
     NaiveDate::from_ymd_opt(2026, 9, 30)

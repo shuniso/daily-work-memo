@@ -10,7 +10,7 @@ use serde::Deserialize;
 
 use crate::entry::EntryType;
 
-pub const APP_ID: &str = "daily-work-memo";
+pub const APP_ID: &str = "tsuratsura";
 
 /// 初回起動時に生成する config（リポジトリの `config.example.toml`）。内蔵デフォルトもこれと同じ内容。
 pub const DEFAULT_CONFIG_TOML: &str = include_str!("../config.example.toml");
