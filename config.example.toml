@@ -1,0 +1,48 @@
+# Daily Work Memo
+
+data_dir = ""
+font_size = 15
+autosave_debounce_ms = 250
+entry_header = "[{time}] {label}"
+
+[[entry_types]]
+id = "work"
+label = "作業メモ"
+key = "w"
+template = ""
+
+[[entry_types]]
+id = "redmine"
+label = "Redmine確認"
+key = "r"
+template = ""
+
+[[entry_types]]
+id = "slack"
+label = "Slack確認"
+key = "s"
+template = ""
+
+[[entry_types]]
+id = "mail"
+label = "メール"
+key = "m"
+template = ""
+
+[[entry_types]]
+id = "reminder"
+label = "リマインド"
+key = "d"
+template = ""
+
+[[entry_types]]
+id = "action"
+label = "アクションアイテム"
+key = "a"
+template = ""
+
+[[entry_types]]
+id = "meeting"
+label = "打ち合わせ"
+key = "g"
+template = ""

@@ -1,0 +1,29 @@
+[package]
+name = "daily-work-memo"
+version = "0.1.0"
+edition = "2024"
+rust-version = "1.88"
+description = "今日の1枚のプレーンテキスト業務メモ"
+publish = false
+
+[dependencies]
+atomic-write-file = "0.3.1"
+chrono = { version = "0.4.45", default-features = false, features = ["clock", "std"] }
+directories = "6.0.0"
+iced = { version = "0.14", default-features = false, features = [
+    "wgpu",
+    "tiny-skia",
+    "crisp",
+    "thread-pool",
+    "advanced",
+] }
+serde = { version = "1.0.229", features = ["derive"] }
+toml = "1.1.6"
+
+[profile.release]
+lto = "thin"
+codegen-units = 1
+strip = true
+
+[target.'cfg(target_os = "macos")'.dependencies]
+libc = "0.2"

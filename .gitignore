@@ -1,0 +1,4 @@
+/target
+
+# 本番用 config はコミットしない（サンプルは config.example.toml）
+config.toml
