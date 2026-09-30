@@ -1,16 +1,21 @@
 #!/bin/sh
-# release ビルドから最小限の macOS .app bundle を作る（署名なし）。
+# release ビルドから最小限の macOS .app bundle（Intel / Apple Silicon の universal、署名なし）を作る。
+# 必要なターゲット: rustup target add aarch64-apple-darwin x86_64-apple-darwin
 set -eu
 
 cd "$(dirname "$0")/.."
-cargo build --release
+cargo build --release --target aarch64-apple-darwin
+cargo build --release --target x86_64-apple-darwin
 
 APP=target/release/DailyWorkMemo.app
 VERSION=$(sed -n 's/^version = "\(.*\)"/\1/p' Cargo.toml | head -1)
 
 rm -rf "$APP"
 mkdir -p "$APP/Contents/MacOS"
-cp target/release/daily-work-memo "$APP/Contents/MacOS/daily-work-memo"
+lipo -create \
+  target/aarch64-apple-darwin/release/daily-work-memo \
+  target/x86_64-apple-darwin/release/daily-work-memo \
+  -output "$APP/Contents/MacOS/daily-work-memo"
 
 cat > "$APP/Contents/Info.plist" <<EOF
 <?xml version="1.0" encoding="UTF-8"?>

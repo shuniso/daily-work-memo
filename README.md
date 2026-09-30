@@ -34,13 +34,13 @@ cargo fmt --check
 cargo clippy --all-targets --all-features -- -D warnings
 cargo test
 cargo build --release
-./scripts/bundle-macos.sh        # target/release/DailyWorkMemo.app（署名なし）
+./scripts/bundle-macos.sh        # target/release/DailyWorkMemo.app（universal・署名なし）
 cargo run --release --example spike -- 10000   # Phase 0 spike
 ```
 
 ## Phase 0 Go / No-Go
 
-**Go（条件付き）** — macOS で起動 0.3 s（warm）、アイドル CPU 0.1〜0.2 %、通常サイズで RSS 約 40〜50 MB、日本語 IME 入力も動作。
+**Go（条件付き）** — macOS で起動 0.3 s（warm）、アイドル CPU 0.1〜0.2 %、通常サイズで RSS 約 89 MB（Apple M3 ネイティブ。Rosetta 実行時は約 45 MB）、日本語 IME 入力も動作。
 日次テキストが数百 KB を超えると RSS が 150 MB を超える制約あり。Windows 実機での確認は未実施。詳細は [docs/PERFORMANCE.md](docs/PERFORMANCE.md)。
 
 ## 仕様との差分

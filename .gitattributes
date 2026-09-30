@@ -1,0 +1,2 @@
+# テスト用 fixture は改行・バイト列をそのまま保つ（Windows の autocrlf で CRLF にしない）
+fixtures/** -text
