@@ -5,11 +5,28 @@ pub mod config;
 pub mod date;
 pub mod editor;
 pub mod entry;
+pub mod instance;
 pub mod saver;
 pub mod storage;
 pub mod ui;
 
 pub fn run() -> iced::Result {
+    let (config_path, _) = config::paths();
+    let lock_path = config_path.with_file_name("instance.lock");
+    // ロックを取れない環境（権限など）では、メモを使えなくするより起動を優先する
+    let _lock = match instance::acquire(&lock_path) {
+        Ok(lock) => Some(lock),
+        Err(instance::AcquireError::AlreadyRunning) => return show_already_running(),
+        Err(instance::AcquireError::Io(e)) => {
+            eprintln!(
+                "[{}] 多重起動防止のロックを取れません: {} ({e})",
+                config::APP_ID,
+                lock_path.display()
+            );
+            None
+        }
+    };
+
     #[cfg(target_os = "macos")]
     wait_for_saves_at_exit();
 
@@ -18,6 +35,20 @@ pub fn run() -> iced::Result {
         .subscription(app::App::subscription)
         .exit_on_close_request(false)
         .window_size((720.0, 640.0))
+        .run()
+}
+
+/// 既に起動中であることだけを伝える小さなウィンドウ。
+fn show_already_running() -> iced::Result {
+    fn view(_: &()) -> iced::Element<'_, ()> {
+        iced::widget::container(iced::widget::text("つらつら は既に起動しています。").size(14))
+            .center(iced::Fill)
+            .into()
+    }
+
+    iced::application(|| (), |_: &mut (), _: ()| {}, view)
+        .title(|_: &()| "つらつら".to_owned())
+        .window_size((360.0, 100.0))
         .run()
 }
 

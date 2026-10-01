@@ -184,6 +184,14 @@ fn write_initial(path: &Path) -> io::Result<()> {
         .write_all(DEFAULT_CONFIG_TOML.as_bytes())
 }
 
+/// `(configファイル, デフォルトのデータディレクトリ)`。OS標準の場所が取れなければカレントディレクトリ配下。
+pub fn paths() -> (PathBuf, PathBuf) {
+    default_paths().unwrap_or_else(|| {
+        let fallback = std::env::current_dir().unwrap_or_default().join(APP_ID);
+        (fallback.join("config.toml"), fallback)
+    })
+}
+
 /// OS標準の `(configファイル, デフォルトのデータディレクトリ)`。
 pub fn default_paths() -> Option<(PathBuf, PathBuf)> {
     let dirs = directories::BaseDirs::new()?;

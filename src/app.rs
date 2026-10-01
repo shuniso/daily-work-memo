@@ -61,10 +61,7 @@ pub enum Message {
 
 impl App {
     pub fn new() -> (Self, Task<Message>) {
-        let (config_path, default_data_dir) = config::default_paths().unwrap_or_else(|| {
-            let fallback = std::env::current_dir().unwrap_or_default().join(APP_ID);
-            (fallback.join("config.toml"), fallback)
-        });
+        let (config_path, default_data_dir) = config::paths();
 
         (
             Self::with_paths(&config_path, &default_data_dir, date::today()),
