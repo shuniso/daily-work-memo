@@ -18,8 +18,9 @@ fn entry(id: &str, label: &str, key: &str) -> String {
 fn default_toml_matches_builtin_default() {
     let config = Config::parse(DEFAULT_CONFIG_TOML).unwrap();
     assert_eq!(config, Config::default());
-    assert_eq!(config.entry_types.len(), 7);
+    assert_eq!(config.entry_types.len(), 5);
     assert!(config.entry_types.iter().all(|e| e.template.is_empty()));
+    assert_eq!(config.prefixes.len(), 3);
 }
 
 #[test]
@@ -41,6 +42,41 @@ fn omitted_fields_use_defaults() {
     assert_eq!(config.font_size, 20);
     assert_eq!(config.retention_days, 30);
     assert_eq!(config.entry_types, Config::default().entry_types);
+    assert_eq!(config.prefixes, Config::default().prefixes);
+}
+
+#[test]
+fn parses_custom_prefixes() {
+    let config = Config::parse("[[prefixes]]\ntext = \"【要確認】\"\nkey = \"C\"\n").unwrap();
+    assert_eq!(config.prefixes.len(), 1);
+    assert_eq!(config.prefixes[0].text, "【要確認】");
+    assert_eq!(config.prefixes[0].key_char(), Some('c'));
+}
+
+#[test]
+fn allows_empty_prefixes() {
+    assert!(
+        Config::parse("prefixes = []\n")
+            .unwrap()
+            .prefixes
+            .is_empty()
+    );
+}
+
+#[test]
+fn rejects_invalid_prefixes() {
+    let prefix = |text: &str, key: &str| format!("[[prefixes]]\ntext = {text:?}\nkey = {key:?}\n");
+    for source in [
+        prefix(" ", "a"),
+        prefix("a\nb", "a"),
+        prefix("<a>", "ab"),
+        prefix("<a>", "a") + &prefix("<b>", "A"),
+    ] {
+        assert!(
+            matches!(Config::parse(&source), Err(ConfigError::Invalid(_))),
+            "{source}"
+        );
+    }
 }
 
 #[test]

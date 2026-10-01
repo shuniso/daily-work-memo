@@ -1,4 +1,4 @@
-//! 作業種別とテンプレート展開。
+//! 作業種別・プレフィックスとテンプレート展開。
 
 use chrono::NaiveDateTime;
 use serde::Deserialize;
@@ -16,11 +16,31 @@ pub struct EntryType {
 impl EntryType {
     /// 比較用に小文字化したアクセラレータキー。
     pub fn key_char(&self) -> Option<char> {
-        let mut chars = self.key.chars();
-        match (chars.next(), chars.next()) {
-            (Some(c), None) => c.to_lowercase().next(),
-            _ => None,
-        }
+        key_char(&self.key)
+    }
+}
+
+/// 行頭に付ける目印。`text` をそのまま挿入する。
+#[derive(Debug, Clone, PartialEq, Eq, Deserialize)]
+#[serde(deny_unknown_fields)]
+pub struct Prefix {
+    pub text: String,
+    pub key: String,
+}
+
+impl Prefix {
+    /// 比較用に小文字化したアクセラレータキー。
+    pub fn key_char(&self) -> Option<char> {
+        key_char(&self.key)
+    }
+}
+
+/// 1文字のキー指定を小文字化して返す。1文字でなければ `None`。
+pub fn key_char(key: &str) -> Option<char> {
+    let mut chars = key.chars();
+    match (chars.next(), chars.next()) {
+        (Some(c), None) => c.to_lowercase().next(),
+        _ => None,
     }
 }
 

@@ -1,15 +1,14 @@
-//! 作業種別セレクタのオーバーレイ。
+//! 作業種別・プレフィックスのセレクタのオーバーレイ。
 
 use iced::widget::{button, center, column, container, mouse_area, opaque, row, text};
 use iced::{Color, Element, Fill, border};
 
 use crate::app::Message;
-use crate::entry::EntryType;
 
-pub fn view(entries: &[EntryType], selected: usize) -> Element<'_, Message> {
-    let items = entries.iter().enumerate().map(|(index, entry)| {
-        let key = entry.key.to_uppercase();
-        button(row![text(key).width(28), text(&entry.label)])
+/// `items` は `(キー, 表示名)`。
+pub fn view<'a>(items: &[(&'a str, &'a str)], selected: usize) -> Element<'a, Message> {
+    let items = items.iter().enumerate().map(|(index, (key, label))| {
+        button(row![text(key.to_uppercase()).width(28), text(*label)])
             .width(Fill)
             .padding([6, 10])
             .style(if index == selected {
@@ -17,7 +16,7 @@ pub fn view(entries: &[EntryType], selected: usize) -> Element<'_, Message> {
             } else {
                 button::text
             })
-            .on_press(Message::ChooseEntry(index))
+            .on_press(Message::Choose(index))
             .into()
     });
 

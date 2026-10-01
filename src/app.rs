@@ -17,6 +17,13 @@ use crate::{date, entry, saver, storage, ui};
 
 const EDITOR_ID: &str = "editor";
 
+/// セレクタの種類。
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum PickerKind {
+    Entry,
+    Prefix,
+}
+
 pub struct App {
     config: Config,
     data_dir: PathBuf,
@@ -24,8 +31,8 @@ pub struct App {
     path: PathBuf,
     content: text_editor::Content,
     history: History,
-    /// 開いている時は選択中の行番号。
-    picker: Option<usize>,
+    /// 開いている時は種類と選択中の行番号。
+    picker: Option<(PickerKind, usize)>,
     /// 編集ごとに増える版番号。`saved_rev` と一致すれば保存済み。
     rev: u64,
     saved_rev: u64,
@@ -44,9 +51,9 @@ pub struct App {
 #[derive(Debug, Clone)]
 pub enum Message {
     Edit(text_editor::Action),
-    OpenPicker,
+    OpenPicker(PickerKind),
     ClosePicker,
-    ChooseEntry(usize),
+    Choose(usize),
     PickerKey(Key, keyboard::key::Physical, keyboard::Modifiers),
     Undo,
     Redo,
@@ -142,15 +149,18 @@ impl App {
                     self.mark_edited();
                 }
             }
-            Message::OpenPicker => {
-                self.picker = Some(0);
+            Message::OpenPicker(kind) => {
+                if self.picker_items(kind).is_empty() {
+                    return Task::none();
+                }
+                self.picker = Some((kind, 0));
                 return operate(focusable::unfocus());
             }
             Message::ClosePicker => {
                 self.picker = None;
                 return operation::focus(EDITOR_ID);
             }
-            Message::ChooseEntry(index) => return self.choose_entry(index),
+            Message::Choose(index) => return self.choose(index),
             Message::PickerKey(key, physical, modifiers) => {
                 return self.picker_key(key, physical, modifiers);
             }
@@ -195,17 +205,47 @@ impl App {
         }
     }
 
-    fn choose_entry(&mut self, index: usize) -> Task<Message> {
-        self.picker = None;
-        if let Some(entry_type) = self.config.entry_types.get(index) {
-            let body = entry::entry_text(
-                &self.config.entry_header,
-                entry_type,
-                Local::now().naive_local(),
-            );
-            self.history.checkpoint(&self.content);
-            editor::insert_entry(&mut self.content, &body);
-            self.mark_edited();
+    /// セレクタの `(キー, 表示名)`。
+    fn picker_items(&self, kind: PickerKind) -> Vec<(&str, &str)> {
+        match kind {
+            PickerKind::Entry => self
+                .config
+                .entry_types
+                .iter()
+                .map(|e| (e.key.as_str(), e.label.as_str()))
+                .collect(),
+            PickerKind::Prefix => self
+                .config
+                .prefixes
+                .iter()
+                .map(|p| (p.key.as_str(), p.text.trim()))
+                .collect(),
+        }
+    }
+
+    /// 開いているセレクタの `index` 番目を挿入して閉じる。
+    fn choose(&mut self, index: usize) -> Task<Message> {
+        match self.picker.take() {
+            Some((PickerKind::Entry, _)) => {
+                if let Some(entry_type) = self.config.entry_types.get(index) {
+                    let body = entry::entry_text(
+                        &self.config.entry_header,
+                        entry_type,
+                        Local::now().naive_local(),
+                    );
+                    self.history.checkpoint(&self.content);
+                    editor::insert_entry(&mut self.content, &body);
+                    self.mark_edited();
+                }
+            }
+            Some((PickerKind::Prefix, _)) => {
+                if let Some(prefix) = self.config.prefixes.get(index) {
+                    self.history.checkpoint(&self.content);
+                    editor::insert_prefix(&mut self.content, &prefix.text);
+                    self.mark_edited();
+                }
+            }
+            None => {}
         }
         operation::focus(EDITOR_ID)
     }
@@ -216,26 +256,27 @@ impl App {
         physical: keyboard::key::Physical,
         modifiers: keyboard::Modifiers,
     ) -> Task<Message> {
-        let Some(selected) = self.picker else {
+        let Some((kind, selected)) = self.picker else {
             return Task::none();
         };
-        let count = self.config.entry_types.len();
+        let items = self.picker_items(kind);
+        let count = items.len();
 
         match key.as_ref() {
             Key::Named(key::Named::Escape) => return self.update(Message::ClosePicker),
-            Key::Named(key::Named::Enter) => return self.choose_entry(selected),
-            Key::Named(key::Named::ArrowUp) => self.picker = Some((selected + count - 1) % count),
-            Key::Named(key::Named::ArrowDown) => self.picker = Some((selected + 1) % count),
+            Key::Named(key::Named::Enter) => return self.choose(selected),
+            Key::Named(key::Named::ArrowUp) => {
+                self.picker = Some((kind, (selected + count - 1) % count));
+            }
+            Key::Named(key::Named::ArrowDown) => self.picker = Some((kind, (selected + 1) % count)),
             _ if modifiers.command() || modifiers.control() || modifiers.alt() => {}
             _ => {
                 let pressed = key.to_latin(physical).and_then(|c| c.to_lowercase().next());
-                if let Some(index) = self
-                    .config
-                    .entry_types
+                if let Some(index) = items
                     .iter()
-                    .position(|e| pressed.is_some() && e.key_char() == pressed)
+                    .position(|(key, _)| pressed.is_some() && entry::key_char(key) == pressed)
                 {
-                    return self.choose_entry(index);
+                    return self.choose(index);
                 }
             }
         }
@@ -405,8 +446,8 @@ impl App {
 
         // ピッカーや通知の有無でウィジェット構造を変えない（エディタのフォーカスを保つ）
         let mut body = stack![editor];
-        if let Some(selected) = self.picker {
-            body = body.push(ui::entry_picker::view(&self.config.entry_types, selected));
+        if let Some((kind, selected)) = self.picker {
+            body = body.push(ui::picker::view(&self.picker_items(kind), selected));
         }
 
         let mut notices = column![].spacing(4);
@@ -492,7 +533,8 @@ fn key_binding(press: KeyPress) -> Option<Binding<Message>> {
     let modifiers = press.modifiers;
     if modifiers.command() {
         let custom = match (press.key.to_latin(press.physical_key), modifiers.shift()) {
-            (Some('k'), false) => Some(Message::OpenPicker),
+            (Some('k'), false) => Some(Message::OpenPicker(PickerKind::Entry)),
+            (Some('l'), false) => Some(Message::OpenPicker(PickerKind::Prefix)),
             (Some('c'), true) => Some(Message::CopyAll),
             (Some('z'), false) => Some(Message::Undo),
             (Some('z'), true) => Some(Message::Redo),

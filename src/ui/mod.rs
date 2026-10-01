@@ -1,1 +1,1 @@
-pub mod entry_picker;
+pub mod picker;

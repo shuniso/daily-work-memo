@@ -1,4 +1,4 @@
-//! TextEditor 操作: Undo/Redo 履歴とエントリ挿入。
+//! TextEditor 操作: Undo/Redo 履歴とエントリ・プレフィックス挿入。
 //!
 //! Iced 0.14 の TextEditor は Undo/Redo を持たないため、
 //! 編集のまとまりごとに全文スナップショットを取る最小実装を置く。
@@ -7,7 +7,7 @@ use std::collections::VecDeque;
 use std::sync::Arc;
 use std::time::{Duration, Instant};
 
-use iced::widget::text_editor::{Action, Content, Cursor, Edit, Motion};
+use iced::widget::text_editor::{Action, Content, Cursor, Edit, Motion, Position};
 
 use crate::entry;
 
@@ -133,6 +133,32 @@ pub fn insert_entry(content: &mut Content, body: &str) {
     content.perform(Action::Edit(Edit::Paste(Arc::new(text))));
     for _ in 0..move_left {
         content.perform(Action::Move(Motion::Left));
+    }
+}
+
+/// プレフィックスをカーソル行の先頭（インデントの後ろ）へ挿入する。
+///
+/// カーソルは元の文字の位置に留める。選択は解除する。
+pub fn insert_prefix(content: &mut Content, prefix: &str) {
+    let Position { line, column } = content.cursor().position;
+    let text = content
+        .line(line)
+        .map(|line| line.text.into_owned())
+        .unwrap_or_default();
+    let indent = text.len() - text.trim_start().len();
+    let move_to = |content: &mut Content, column| {
+        content.move_to(Cursor {
+            position: Position { line, column },
+            selection: None,
+        });
+    };
+
+    move_to(content, indent);
+    content.perform(Action::Edit(Edit::Paste(Arc::new(prefix.to_owned()))));
+    if column < indent {
+        move_to(content, column);
+    } else {
+        move_to(content, column + prefix.len());
     }
 }
 

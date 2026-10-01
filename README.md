@@ -12,7 +12,8 @@
 
 | 操作 | キー（`Primary` = macOS: Cmd / Windows: Ctrl） |
 |---|---|
-| 作業種別を挿入 | `Primary+K` → キー（`W` `R` `S` `M` `D` `A` `G`）、または `↑↓` + `Enter` / クリック。`Esc` で閉じる |
+| 作業種別を挿入 | `Primary+K` → キー（`W` `R` `S` `M` `G`）、または `↑↓` + `Enter` / クリック。`Esc` で閉じる |
+| 行頭にプレフィックスを付ける | `Primary+L` → キー（`A` `R` `I`）。選び方は作業種別と同じ |
 | 今日の全文をコピー | `Primary+Shift+C` |
 | Undo / Redo | `Primary+Z` / macOS: `Cmd+Shift+Z`、Windows: `Ctrl+Y` または `Ctrl+Shift+Z` |
 | 即時保存（通常は不要） | `Primary+S` |
@@ -53,6 +54,7 @@ cargo run --release --example spike -- 10000   # Phase 0 spike
 - **`src/saver.rs`・`src/lib.rs` を追加**: 自動保存の debounce と書き込みを専用スレッドで行うため（UI をブロックしない）。`lib.rs` は `tests/` から各モジュールを使うため。
 - **macOS の Cmd+Q 対策**: winit の標準メニューの Quit は close request を経ずに終了するため、Cmd キー押下時点で未保存分を書き込みに回し、終了処理（`atexit`）で書き込み完了を最大2秒待つ。保存失敗中・読み込み失敗中に終了した場合は、日次ファイルを上書きせず `<data_dir>/recovery/YYYY-MM-DD-HHMMSS.txt`（書けなければ一時ディレクトリ）へ本文を退避する。このため macOS のみ `libc` に直接依存。
 - **全文コピー失敗は通知しない**: Iced のクリップボード書き込みは成否を返さないため検出できない。
+- **プレフィックス挿入（`Primary+L`）を追加**: `<action item> ` `<remind> ` `<重要> ` などの目印を、カーソルがある行の先頭（インデントの後ろ）へ挿入する。カーソルは元の文字の位置に留まる。config の `[[prefixes]]`（`text` と `key`）で変更でき、`prefixes = []` で無効。これに伴い、作業種別の既定から「リマインド」「アクションアイテム」を外した（既存の config.toml はそのまま）。
 - **Esc でエディタのフォーカスを外さない**: Iced 既定では Esc でフォーカスが外れ入力できなくなるため無効化。
 - **`font_size` を 8〜72 に制限**、**未知の config キーはエラー**（typo の見落とし防止）。config エラー時も、有効な絶対パスの `data_dir` だけは引き継ぐ（メモの保存先が分かれるのを防ぐ）。
 - **貼り付け・IME確定の CR は LF へ正規化**して挿入する。

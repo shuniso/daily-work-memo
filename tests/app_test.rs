@@ -4,7 +4,7 @@ use std::path::PathBuf;
 use chrono::NaiveDate;
 use iced::widget::text_editor::{Action, Edit};
 
-use tsuratsura::app::{App, Message};
+use tsuratsura::app::{App, Message, PickerKind};
 use tsuratsura::storage::daily_path;
 
 fn temp_dir(name: &str) -> PathBuf {
@@ -93,6 +93,35 @@ fn crlf_paste_is_normalized() {
     ))));
 
     assert_eq!(app.text(), "a\nb\n");
+}
+
+#[test]
+fn prefix_picker_inserts_at_line_start_and_undoes_in_one_step() {
+    let dir = temp_dir("prefix");
+    let mut app = App::with_paths(&dir.join("config.toml"), &dir.join("data"), d(2026, 9, 30));
+    type_str(&mut app, "折り返し連絡する");
+
+    let _ = app.update(Message::OpenPicker(PickerKind::Prefix));
+    let _ = app.update(Message::Choose(1));
+    assert_eq!(app.text(), "<remind> 折り返し連絡する");
+
+    // セレクタが閉じた後の選択は何も挿入しない
+    let _ = app.update(Message::Choose(0));
+    assert_eq!(app.text(), "<remind> 折り返し連絡する");
+
+    let _ = app.update(Message::Undo);
+    assert_eq!(app.text(), "折り返し連絡する");
+}
+
+#[test]
+fn entry_picker_still_inserts_header() {
+    let dir = temp_dir("entry-picker");
+    let mut app = App::with_paths(&dir.join("config.toml"), &dir.join("data"), d(2026, 9, 30));
+
+    let _ = app.update(Message::OpenPicker(PickerKind::Entry));
+    let _ = app.update(Message::Choose(0));
+
+    assert!(app.text().ends_with("] 作業メモ\n"), "{}", app.text());
 }
 
 fn write_day(data_dir: &std::path::Path, date: NaiveDate) -> PathBuf {

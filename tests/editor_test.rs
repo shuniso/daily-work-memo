@@ -1,6 +1,6 @@
-use iced::widget::text_editor::{Action, Content, Edit, Motion};
+use iced::widget::text_editor::{Action, Content, Cursor, Edit, Motion, Position};
 
-use tsuratsura::editor::{History, insert_entry};
+use tsuratsura::editor::{History, insert_entry, insert_prefix};
 
 fn type_str(content: &mut Content, history: &mut History, s: &str) {
     for c in s.chars() {
@@ -46,6 +46,51 @@ fn does_not_replace_selection() {
     content.perform(Action::SelectAll);
     insert_entry(&mut content, "H\n");
     assert_eq!(content.text(), "選択範囲\nH\n");
+}
+
+fn move_to(content: &mut Content, line: usize, column: usize) {
+    content.move_to(Cursor {
+        position: Position { line, column },
+        selection: None,
+    });
+}
+
+#[test]
+fn prefix_on_empty_line_leaves_cursor_after_it() {
+    let mut content = Content::new();
+    insert_prefix(&mut content, "<重要> ");
+    assert_eq!(content.text(), "<重要> ");
+    assert_eq!(content.cursor().position.column, "<重要> ".len());
+}
+
+#[test]
+fn prefix_goes_to_line_start_and_keeps_cursor_on_same_char() {
+    let mut content = Content::with_text("一行目\n二行目の文章\n三行目");
+    move_to(&mut content, 1, "二行目".len());
+    insert_prefix(&mut content, "<remind> ");
+    assert_eq!(content.text(), "一行目\n<remind> 二行目の文章\n三行目");
+
+    let cursor = content.cursor();
+    assert_eq!(cursor.position.line, 1);
+    assert_eq!(cursor.position.column, "<remind> 二行目".len());
+    assert!(cursor.selection.is_none());
+}
+
+#[test]
+fn prefix_goes_after_indent() {
+    let mut content = Content::with_text("  字下げ");
+    move_to(&mut content, 0, 1);
+    insert_prefix(&mut content, "<重要> ");
+    assert_eq!(content.text(), "  <重要> 字下げ");
+    assert_eq!(content.cursor().position.column, 1);
+}
+
+#[test]
+fn prefix_does_not_replace_selection() {
+    let mut content = Content::with_text("選択範囲");
+    content.perform(Action::SelectAll);
+    insert_prefix(&mut content, "<重要> ");
+    assert_eq!(content.text(), "<重要> 選択範囲");
 }
 
 #[test]

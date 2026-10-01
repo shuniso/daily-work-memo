@@ -32,19 +32,20 @@ key = "m"
 template = ""
 
 [[entry_types]]
-id = "reminder"
-label = "リマインド"
-key = "d"
-template = ""
-
-[[entry_types]]
-id = "action"
-label = "アクションアイテム"
-key = "a"
-template = ""
-
-[[entry_types]]
 id = "meeting"
 label = "打ち合わせ"
 key = "g"
 template = ""
+
+# 行頭に付ける目印。text をそのまま挿入する（末尾の空白も含む）。
+[[prefixes]]
+text = "<action item> "
+key = "a"
+
+[[prefixes]]
+text = "<remind> "
+key = "r"
+
+[[prefixes]]
+text = "<重要> "
+key = "i"

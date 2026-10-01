@@ -8,7 +8,7 @@ use std::path::{Path, PathBuf};
 
 use serde::Deserialize;
 
-use crate::entry::EntryType;
+use crate::entry::{EntryType, Prefix};
 
 pub const APP_ID: &str = "tsuratsura";
 
@@ -29,6 +29,8 @@ pub struct Config {
     pub retention_days: u32,
     pub entry_header: String,
     pub entry_types: Vec<EntryType>,
+    /// 空ならプレフィックスのセレクタを開かない。
+    pub prefixes: Vec<Prefix>,
 }
 
 impl Default for Config {
@@ -38,6 +40,10 @@ impl Default for Config {
             label: label.into(),
             key: key.into(),
             template: String::new(),
+        };
+        let prefix = |text: &str, key: &str| Prefix {
+            text: text.into(),
+            key: key.into(),
         };
 
         Self {
@@ -51,9 +57,12 @@ impl Default for Config {
                 entry("redmine", "Redmine確認", "r"),
                 entry("slack", "Slack確認", "s"),
                 entry("mail", "メール", "m"),
-                entry("reminder", "リマインド", "d"),
-                entry("action", "アクションアイテム", "a"),
                 entry("meeting", "打ち合わせ", "g"),
+            ],
+            prefixes: vec![
+                prefix("<action item> ", "a"),
+                prefix("<remind> ", "r"),
+                prefix("<重要> ", "i"),
             ],
         }
     }
@@ -125,6 +134,31 @@ impl Config {
             };
             if !keys.insert(key) {
                 return invalid(format!("key \"{}\" が重複しています", entry.key));
+            }
+        }
+
+        let mut keys = HashSet::new();
+        for prefix in &self.prefixes {
+            if prefix.text.trim().is_empty() {
+                return invalid("prefixes に空の text があります".into());
+            }
+            if prefix.text.contains(['\n', '\r']) {
+                return invalid(format!(
+                    "prefixes の text \"{}\" に改行は使えません",
+                    prefix.text.escape_debug()
+                ));
+            }
+            let Some(key) = prefix.key_char() else {
+                return invalid(format!(
+                    "prefixes の text \"{}\" の key は1文字にしてください",
+                    prefix.text
+                ));
+            };
+            if !keys.insert(key) {
+                return invalid(format!(
+                    "prefixes の key \"{}\" が重複しています",
+                    prefix.key
+                ));
             }
         }
 
