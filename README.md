@@ -26,7 +26,7 @@
 | config | `~/Library/Application Support/tsuratsura/config.toml` | `%APPDATA%\tsuratsura\config.toml` |
 | 日次メモ | `~/Library/Application Support/tsuratsura/daily/YYYY-MM-DD.txt` | `%APPDATA%\tsuratsura\daily\YYYY-MM-DD.txt` |
 
-日次メモは自動では削除されません（不要なら手動で削除）。UTF-8（BOMなし）・LF の `.txt` です。config は初回起動時に [config.example.toml](config.example.toml) と同じ内容で生成され、変更は再起動で反映されます。本番用の `config.toml` はコミットしません（`.gitignore` 済み）。
+日次メモは UTF-8（BOMなし）・LF の `.txt` です。**30日より前の日次メモは、起動時と日付切り替え時に自動で削除されます**（ゴミ箱には入りません）。日数は config の `retention_days` で変更でき、`0` で削除しなくなります。config は初回起動時に [config.example.toml](config.example.toml) と同じ内容で生成され、変更は再起動で反映されます。本番用の `config.toml` はコミットしません（`.gitignore` 済み）。
 `data_dir` には絶対パスのみ指定できます（`~` は展開しません）。
 
 v0.1.0（旧名 Daily Work Memo）のメモ・config は `daily-work-memo` フォルダにあります。引き継ぐ場合は、新しい版を起動する前にフォルダ名を `tsuratsura` に変えてください（macOS: `~/Library/Application Support/daily-work-memo`、Windows: `%APPDATA%\daily-work-memo`）。
@@ -58,6 +58,7 @@ cargo run --release --example spike -- 10000   # Phase 0 spike
 - **貼り付け・IME確定の CR は LF へ正規化**して挿入する。
 - **日次ファイル読み込み失敗時は保存を停止**し、未編集ならフォーカス復帰時に読み直す。
 - **ログは stderr のみ**（本文は出さない）。Windows の release ビルドはコンソールを持たないためログは見えない。
+- **古い日次メモの自動削除**: `retention_days`（既定 30、`0` で無効）より前の `daily/YYYY-MM-DD.txt` を起動時・日付切り替え時に削除する。それ以外の名前のファイルと `recovery/` には触れない。config を読めずに内蔵デフォルトで起動した時は削除しない（保持日数の設定を取り違えて消すのを防ぐ）。
 - **多重起動を禁止**: config と同じディレクトリの `instance.lock` を排他ロックし、2つ目の起動は「既に起動しています」とだけ表示する（既存ウィンドウの前面化はしない）。ロック自体を作れない環境では起動を優先する。ロックのため `fs4` に依存。
 
 ## 既知の制約

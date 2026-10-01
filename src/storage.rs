@@ -5,7 +5,7 @@ use std::io::{self, Write};
 use std::path::{Path, PathBuf};
 
 use atomic_write_file::AtomicWriteFile;
-use chrono::NaiveDate;
+use chrono::{Days, NaiveDate};
 
 /// `<data_dir>/daily/YYYY-MM-DD.txt`
 pub fn daily_path(data_dir: &Path, date: NaiveDate) -> PathBuf {
@@ -38,6 +38,44 @@ pub fn open_daily(path: &Path) -> io::Result<String> {
     let text = text.strip_prefix('\u{feff}').unwrap_or(&text);
 
     Ok(normalize_newlines(text))
+}
+
+/// `retention_days` 日より前の日次ファイルを削除する。
+///
+/// 対象は `<data_dir>/daily/` 直下の `YYYY-MM-DD.txt` という名前の通常ファイルだけ。
+/// 消せないファイルがあっても残りは続け、最初のエラーを返す。
+pub fn purge_old_daily(data_dir: &Path, today: NaiveDate, retention_days: u32) -> io::Result<()> {
+    let Some(oldest_kept) = today.checked_sub_days(Days::new(u64::from(retention_days))) else {
+        return Ok(());
+    };
+    let entries = match fs::read_dir(data_dir.join("daily")) {
+        Ok(entries) => entries,
+        Err(e) if e.kind() == io::ErrorKind::NotFound => return Ok(()),
+        Err(e) => return Err(e),
+    };
+
+    let mut result = Ok(());
+    for entry in entries {
+        let removed = entry.and_then(|entry| {
+            let is_old = daily_date(&entry.file_name()).is_some_and(|date| date < oldest_kept);
+            if is_old && entry.file_type()?.is_file() {
+                fs::remove_file(entry.path())?;
+            }
+            Ok(())
+        });
+        if result.is_ok() {
+            result = removed;
+        }
+    }
+    result
+}
+
+/// `YYYY-MM-DD.txt` 形式のファイル名ならその日付。
+fn daily_date(file_name: &std::ffi::OsStr) -> Option<NaiveDate> {
+    let stem = file_name.to_str()?.strip_suffix(".txt")?;
+    let date = NaiveDate::parse_from_str(stem, "%Y-%m-%d").ok()?;
+    // 桁数の違う表記（2026-9-3 など）はアプリが作ったファイルではない
+    (date.format("%Y-%m-%d").to_string() == stem).then_some(date)
 }
 
 /// 改行をLFへ揃える。

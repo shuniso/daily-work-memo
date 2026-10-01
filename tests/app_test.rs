@@ -94,3 +94,54 @@ fn crlf_paste_is_normalized() {
 
     assert_eq!(app.text(), "a\nb\n");
 }
+
+fn write_day(data_dir: &std::path::Path, date: NaiveDate) -> PathBuf {
+    let path = daily_path(data_dir, date);
+    fs::create_dir_all(path.parent().unwrap()).unwrap();
+    fs::write(&path, "過去のメモ").unwrap();
+    path
+}
+
+#[test]
+fn old_days_are_purged_on_startup_and_rollover() {
+    let dir = temp_dir("purge");
+    let data_dir = dir.join("data");
+    let expired = write_day(&data_dir, d(2026, 8, 30));
+    let expires_next_day = write_day(&data_dir, d(2026, 8, 31));
+
+    let mut app = App::with_paths(&dir.join("config.toml"), &data_dir, d(2026, 9, 30));
+    assert!(!expired.exists());
+    assert!(expires_next_day.exists());
+
+    app.check_date(d(2026, 10, 1));
+    assert!(!expires_next_day.exists());
+    assert!(daily_path(&data_dir, d(2026, 9, 30)).exists());
+}
+
+#[test]
+fn retention_days_zero_keeps_everything() {
+    let dir = temp_dir("purge-off");
+    let data_dir = dir.join("data");
+    let old = write_day(&data_dir, d(2020, 1, 1));
+    fs::write(dir.join("config.toml"), "retention_days = 0\n").unwrap();
+
+    let _app = App::with_paths(&dir.join("config.toml"), &data_dir, d(2026, 9, 30));
+
+    assert!(old.exists());
+}
+
+#[test]
+fn nothing_is_purged_when_config_is_invalid() {
+    let dir = temp_dir("purge-bad-config");
+    let data_dir = dir.join("data");
+    let old = write_day(&data_dir, d(2020, 1, 1));
+    fs::write(
+        dir.join("config.toml"),
+        "retention_days = 365\nfont_size = 999\n",
+    )
+    .unwrap();
+
+    let _app = App::with_paths(&dir.join("config.toml"), &data_dir, d(2026, 9, 30));
+
+    assert!(old.exists());
+}

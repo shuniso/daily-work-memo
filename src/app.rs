@@ -102,6 +102,7 @@ impl App {
             primary_held: false,
         };
         app.open_day(active_date);
+        app.purge_old_days();
         app
     }
 
@@ -331,6 +332,7 @@ impl App {
         if date::needs_rollover(self.active_date, today) {
             if self.flush_sync().is_ok() {
                 self.open_day(today);
+                self.purge_old_days();
             }
         } else if self.load_failed && !self.is_dirty() {
             // 一時的な読み込み失敗なら、フォーカス復帰時に読み直す
@@ -362,6 +364,19 @@ impl App {
                     self.path.display()
                 ));
             }
+        }
+    }
+
+    /// 保持日数を過ぎた日次ファイルを削除する。
+    fn purge_old_days(&self) {
+        // config を読めていない時は保持日数が内蔵デフォルトに戻っているため、削除しない
+        if self.config.retention_days == 0 || self.config_error.is_some() {
+            return;
+        }
+        if let Err(e) =
+            storage::purge_old_daily(&self.data_dir, self.active_date, self.config.retention_days)
+        {
+            eprintln!("[{APP_ID}] 古い日次ファイルの削除に失敗: {e}");
         }
     }
 

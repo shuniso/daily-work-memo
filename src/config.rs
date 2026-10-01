@@ -25,6 +25,8 @@ pub struct Config {
     pub data_dir: String,
     pub font_size: u16,
     pub autosave_debounce_ms: u64,
+    /// 日次メモを残す日数。0 なら削除しない。
+    pub retention_days: u32,
     pub entry_header: String,
     pub entry_types: Vec<EntryType>,
 }
@@ -42,6 +44,7 @@ impl Default for Config {
             data_dir: String::new(),
             font_size: 15,
             autosave_debounce_ms: 250,
+            retention_days: 30,
             entry_header: "[{time}] {label}".into(),
             entry_types: vec![
                 entry("work", "作業メモ", "w"),

@@ -39,6 +39,7 @@ fn parses_custom_config() {
 fn omitted_fields_use_defaults() {
     let config = Config::parse("font_size = 20\n").unwrap();
     assert_eq!(config.font_size, 20);
+    assert_eq!(config.retention_days, 30);
     assert_eq!(config.entry_types, Config::default().entry_types);
 }
 

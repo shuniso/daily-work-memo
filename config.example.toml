@@ -3,6 +3,8 @@
 data_dir = ""
 font_size = 15
 autosave_debounce_ms = 250
+# 日次メモを残す日数。これより古い日次メモは起動時・日付切り替え時に削除する。0 で削除しない。
+retention_days = 30
 entry_header = "[{time}] {label}"
 
 [[entry_types]]

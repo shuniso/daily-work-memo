@@ -3,7 +3,9 @@ use std::path::{Path, PathBuf};
 
 use chrono::NaiveDate;
 
-use tsuratsura::storage::{daily_path, normalize_newlines, open_daily, save_atomic};
+use tsuratsura::storage::{
+    daily_path, normalize_newlines, open_daily, purge_old_daily, save_atomic,
+};
 
 fn temp_dir(name: &str) -> PathBuf {
     let dir = std::env::temp_dir().join(format!("dwm-storage-{name}-{}", std::process::id()));
@@ -98,4 +100,84 @@ fn save_failure_is_propagated() {
 
     assert!(save_atomic(&blocker.join("memo.txt"), "x").is_err());
     assert_eq!(fs::read_to_string(&blocker).unwrap(), "file");
+}
+
+fn d(y: i32, m: u32, day: u32) -> NaiveDate {
+    NaiveDate::from_ymd_opt(y, m, day).unwrap()
+}
+
+fn names(dir: &Path) -> Vec<String> {
+    let mut names: Vec<_> = fs::read_dir(dir)
+        .unwrap()
+        .map(|e| e.unwrap().file_name().into_string().unwrap())
+        .collect();
+    names.sort();
+    names
+}
+
+#[test]
+fn purge_removes_only_days_older_than_retention() {
+    let dir = temp_dir("purge");
+    let daily = dir.join("daily");
+    fs::create_dir_all(&daily).unwrap();
+    for name in [
+        "2026-08-31.txt",
+        "2026-09-01.txt",
+        "2026-09-30.txt",
+        "2026-10-01.txt",
+        "2026-10-02.txt",
+    ] {
+        fs::write(daily.join(name), "memo").unwrap();
+    }
+
+    purge_old_daily(&dir, d(2026, 10, 1), 30).unwrap();
+
+    assert_eq!(
+        names(&daily),
+        [
+            "2026-09-01.txt",
+            "2026-09-30.txt",
+            "2026-10-01.txt",
+            "2026-10-02.txt"
+        ]
+    );
+}
+
+#[test]
+fn purge_leaves_files_that_are_not_daily_memos() {
+    let dir = temp_dir("purge-others");
+    let daily = dir.join("daily");
+    fs::create_dir_all(daily.join("2020-01-01.txt")).unwrap();
+    fs::create_dir_all(dir.join("recovery")).unwrap();
+    fs::write(dir.join("recovery").join("2020-01-01-120000.txt"), "x").unwrap();
+    fs::write(dir.join("2020-01-01.txt"), "x").unwrap();
+    for name in [
+        "2020-1-1.txt",
+        "2020-01-01.md",
+        "2020-01-01 copy.txt",
+        "notes.txt",
+    ] {
+        fs::write(daily.join(name), "x").unwrap();
+    }
+
+    purge_old_daily(&dir, d(2026, 10, 1), 30).unwrap();
+
+    assert_eq!(
+        names(&daily),
+        [
+            "2020-01-01 copy.txt",
+            "2020-01-01.md",
+            "2020-01-01.txt",
+            "2020-1-1.txt",
+            "notes.txt"
+        ]
+    );
+    assert!(dir.join("2020-01-01.txt").exists());
+    assert!(dir.join("recovery").join("2020-01-01-120000.txt").exists());
+}
+
+#[test]
+fn purge_without_daily_dir_is_ok() {
+    let dir = temp_dir("purge-missing");
+    assert!(purge_old_daily(&dir, d(2026, 10, 1), 30).is_ok());
 }
