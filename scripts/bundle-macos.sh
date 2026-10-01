@@ -11,7 +11,8 @@ APP=target/release/Tsuratsura.app
 VERSION=$(sed -n 's/^version = "\(.*\)"/\1/p' Cargo.toml | head -1)
 
 rm -rf "$APP"
-mkdir -p "$APP/Contents/MacOS"
+mkdir -p "$APP/Contents/MacOS" "$APP/Contents/Resources"
+cp assets/AppIcon.icns "$APP/Contents/Resources/AppIcon.icns"
 lipo -create \
   target/aarch64-apple-darwin/release/tsuratsura \
   target/x86_64-apple-darwin/release/tsuratsura \
@@ -26,6 +27,7 @@ cat > "$APP/Contents/Info.plist" <<EOF
   <key>CFBundleDisplayName</key><string>つらつら</string>
   <key>CFBundleIdentifier</key><string>tsuratsura</string>
   <key>CFBundleExecutable</key><string>tsuratsura</string>
+  <key>CFBundleIconFile</key><string>AppIcon</string>
   <key>CFBundlePackageType</key><string>APPL</string>
   <key>CFBundleShortVersionString</key><string>${VERSION}</string>
   <key>CFBundleVersion</key><string>${VERSION}</string>
