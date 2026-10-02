@@ -4,7 +4,7 @@ use std::path::{Path, PathBuf};
 use chrono::NaiveDate;
 
 use tsuratsura::storage::{
-    daily_path, normalize_newlines, open_daily, purge_old_daily, save_atomic,
+    daily_path, list_daily, normalize_newlines, open_daily, purge_old_daily, save_atomic,
 };
 
 fn temp_dir(name: &str) -> PathBuf {
@@ -180,4 +180,32 @@ fn purge_leaves_files_that_are_not_daily_memos() {
 fn purge_without_daily_dir_is_ok() {
     let dir = temp_dir("purge-missing");
     assert!(purge_old_daily(&dir, d(2026, 10, 1), 30).is_ok());
+}
+
+#[test]
+fn list_returns_non_empty_daily_memos_newest_first() {
+    let dir = temp_dir("list");
+    let daily = dir.join("daily");
+    fs::create_dir_all(daily.join("2026-09-01.txt")).unwrap();
+    for (name, body) in [
+        ("2026-09-28.txt", "a"),
+        ("2026-10-01.txt", "b"),
+        ("2026-09-30.txt", "c"),
+        ("2026-09-29.txt", ""),
+        ("2026-9-3.txt", "d"),
+        ("memo.txt", "e"),
+    ] {
+        fs::write(daily.join(name), body).unwrap();
+    }
+
+    assert_eq!(
+        list_daily(&dir).unwrap(),
+        [d(2026, 10, 1), d(2026, 9, 30), d(2026, 9, 28)]
+    );
+}
+
+#[test]
+fn list_without_daily_dir_is_empty() {
+    let dir = temp_dir("list-missing");
+    assert!(list_daily(&dir).unwrap().is_empty());
 }

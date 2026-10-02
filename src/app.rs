@@ -7,6 +7,7 @@ use chrono::{Local, NaiveDate};
 use iced::advanced::widget::{operate, operation::focusable};
 use iced::event::{self, Event};
 use iced::keyboard::{self, Key, key};
+use iced::widget::scrollable::RelativeOffset;
 use iced::widget::text_editor::{self, Binding, KeyPress, Status};
 use iced::widget::{column, container, operation, stack, text};
 use iced::{Color, Element, Fill, Subscription, Task, window};
@@ -22,12 +23,20 @@ const EDITOR_ID: &str = "editor";
 pub enum PickerKind {
     Entry,
     Prefix,
+    /// 過去の日次メモ。
+    Day,
 }
 
 pub struct App {
     config: Config,
     data_dir: PathBuf,
     active_date: NaiveDate,
+    /// 最後に確認した今日の日付。
+    today: NaiveDate,
+    /// 今日以外の日を選んで開いている。日付が変わっても今日へ移らない。
+    viewing_past: bool,
+    /// 過去メモのセレクタに出している日付（今日が先頭、以降は新しい順）。
+    days: Vec<NaiveDate>,
     path: PathBuf,
     content: text_editor::Content,
     history: History,
@@ -94,6 +103,9 @@ impl App {
             path: storage::daily_path(&data_dir, active_date),
             data_dir,
             active_date,
+            today,
+            viewing_past: false,
+            days: Vec::new(),
             content: text_editor::Content::new(),
             history: History::default(),
             picker: None,
@@ -123,7 +135,12 @@ impl App {
     }
 
     pub fn title(&self) -> String {
-        format!("つらつら — {}", self.active_date.format("%Y-%m-%d"))
+        let date = self.active_date.format("%Y-%m-%d");
+        if self.viewing_past {
+            format!("つらつら — {date}（過去のメモ）")
+        } else {
+            format!("つらつら — {date}")
+        }
     }
 
     fn is_dirty(&self) -> bool {
@@ -150,11 +167,22 @@ impl App {
                 }
             }
             Message::OpenPicker(kind) => {
-                if self.picker_items(kind).is_empty() {
+                if kind == PickerKind::Day {
+                    self.list_days();
+                }
+                let count = self.picker_items(kind).len();
+                if count == 0 {
                     return Task::none();
                 }
-                self.picker = Some((kind, 0));
-                return operate(focusable::unfocus());
+                // 過去メモは、いま開いている日を選んだ状態で開く
+                let selected = match kind {
+                    PickerKind::Day => self.days.iter().position(|d| *d == self.active_date),
+                    _ => None,
+                };
+                return Task::batch([
+                    operate(focusable::unfocus()),
+                    self.select(kind, selected.unwrap_or(0), count),
+                ]);
             }
             Message::ClosePicker => {
                 self.picker = None;
@@ -206,20 +234,76 @@ impl App {
     }
 
     /// セレクタの `(キー, 表示名)`。
-    fn picker_items(&self, kind: PickerKind) -> Vec<(&str, &str)> {
+    fn picker_items(&self, kind: PickerKind) -> Vec<(String, String)> {
         match kind {
             PickerKind::Entry => self
                 .config
                 .entry_types
                 .iter()
-                .map(|e| (e.key.as_str(), e.label.as_str()))
+                .map(|e| (e.key.clone(), e.label.clone()))
                 .collect(),
             PickerKind::Prefix => self
                 .config
                 .prefixes
                 .iter()
-                .map(|p| (p.key.as_str(), p.text.trim()))
+                .map(|p| (p.key.clone(), p.text.trim().to_owned()))
                 .collect(),
+            // 先頭の9件だけ数字キーで選べる
+            PickerKind::Day => self
+                .days
+                .iter()
+                .enumerate()
+                .map(|(index, day)| {
+                    let key = if index < 9 {
+                        (index + 1).to_string()
+                    } else {
+                        String::new()
+                    };
+                    let label = if *day == self.today {
+                        format!("{}  今日", date::label(*day))
+                    } else {
+                        date::label(*day)
+                    };
+                    (key, label)
+                })
+                .collect(),
+        }
+    }
+
+    /// セレクタの `index` 番目を選択し、一覧をその行が見える位置へ動かす。
+    fn select(&mut self, kind: PickerKind, index: usize, count: usize) -> Task<Message> {
+        self.picker = Some((kind, index));
+        let y = if count > 1 {
+            index as f32 / (count - 1) as f32
+        } else {
+            0.0
+        };
+        operation::snap_to(ui::picker::LIST_ID, RelativeOffset { x: 0.0, y })
+    }
+
+    /// 過去メモのセレクタに出す日付を読み直す。
+    fn list_days(&mut self) {
+        let listed = storage::list_daily(&self.data_dir).unwrap_or_else(|e| {
+            eprintln!("[{APP_ID}] 日次ファイルの一覧を取得できません: {e}");
+            Vec::new()
+        });
+        self.days = std::iter::once(self.today)
+            .chain(listed.into_iter().filter(|day| *day != self.today))
+            .collect();
+    }
+
+    /// 選んだ日の日次ファイルへ移る。いまの日を保存できなければ移らない。
+    fn switch_day(&mut self, day: NaiveDate) {
+        if day == self.active_date && !self.load_failed {
+            return;
+        }
+        if self.flush_sync().is_err() {
+            return;
+        }
+        self.open_day(day);
+        self.viewing_past = day != self.today;
+        if !self.viewing_past {
+            self.purge_old_days();
         }
     }
 
@@ -245,6 +329,11 @@ impl App {
                     self.mark_edited();
                 }
             }
+            Some((PickerKind::Day, _)) => {
+                if let Some(day) = self.days.get(index).copied() {
+                    self.switch_day(day);
+                }
+            }
             None => {}
         }
         operation::focus(EDITOR_ID)
@@ -266,9 +355,11 @@ impl App {
             Key::Named(key::Named::Escape) => return self.update(Message::ClosePicker),
             Key::Named(key::Named::Enter) => return self.choose(selected),
             Key::Named(key::Named::ArrowUp) => {
-                self.picker = Some((kind, (selected + count - 1) % count));
+                return self.select(kind, (selected + count - 1) % count, count);
             }
-            Key::Named(key::Named::ArrowDown) => self.picker = Some((kind, (selected + 1) % count)),
+            Key::Named(key::Named::ArrowDown) => {
+                return self.select(kind, (selected + 1) % count, count);
+            }
             _ if modifiers.command() || modifiers.control() || modifiers.alt() => {}
             _ => {
                 let pressed = key.to_latin(physical).and_then(|c| c.to_lowercase().next());
@@ -369,15 +460,18 @@ impl App {
     }
 
     /// ウィンドウのフォーカス復帰時の日付確認。日付が変わっていれば今日のファイルへ移る。
+    ///
+    /// 過去のメモを選んで開いている間は移らない。
     pub fn check_date(&mut self, today: NaiveDate) {
-        if date::needs_rollover(self.active_date, today) {
+        self.today = today;
+        if !self.viewing_past && date::needs_rollover(self.active_date, today) {
             if self.flush_sync().is_ok() {
                 self.open_day(today);
                 self.purge_old_days();
             }
         } else if self.load_failed && !self.is_dirty() {
             // 一時的な読み込み失敗なら、フォーカス復帰時に読み直す
-            self.open_day(today);
+            self.open_day(self.active_date);
         }
     }
 
@@ -447,8 +541,26 @@ impl App {
         // ピッカーや通知の有無でウィジェット構造を変えない（エディタのフォーカスを保つ）
         let mut body = stack![editor];
         if let Some((kind, selected)) = self.picker {
-            body = body.push(ui::picker::view(&self.picker_items(kind), selected));
+            body = body.push(ui::picker::view(self.picker_items(kind), selected));
         }
+
+        // 過去のメモへ書いていることに気づけるよう、開いている間は上部に出し続ける
+        let mut past = column![];
+        if self.viewing_past {
+            past = past.push(
+                text(format!(
+                    "{} のメモを開いています（編集できます）。{}+E で今日へ戻れます。",
+                    date::label(self.active_date),
+                    if cfg!(target_os = "macos") {
+                        "Cmd"
+                    } else {
+                        "Ctrl"
+                    }
+                ))
+                .size(13),
+            );
+        }
+        let viewing_past = self.viewing_past;
 
         let mut notices = column![].spacing(4);
         let messages = [&self.config_error, &self.load_error, &self.save_error];
@@ -466,6 +578,20 @@ impl App {
         let has_notice = messages.iter().any(|m| m.is_some()) || self.close_armed;
 
         column![
+            container(past)
+                .width(Fill)
+                .padding(if viewing_past { [6, 12] } else { [0, 0] })
+                .style(move |_| {
+                    if viewing_past {
+                        container::Style {
+                            background: Some(Color::from_rgb8(0xFB, 0xF1, 0xD0).into()),
+                            text_color: Some(Color::from_rgb8(0x6B, 0x50, 0x0A)),
+                            ..container::Style::default()
+                        }
+                    } else {
+                        container::Style::default()
+                    }
+                }),
             body,
             container(notices)
                 .width(Fill)
@@ -535,6 +661,7 @@ fn key_binding(press: KeyPress) -> Option<Binding<Message>> {
         let custom = match (press.key.to_latin(press.physical_key), modifiers.shift()) {
             (Some('k'), false) => Some(Message::OpenPicker(PickerKind::Entry)),
             (Some('l'), false) => Some(Message::OpenPicker(PickerKind::Prefix)),
+            (Some('e'), false) => Some(Message::OpenPicker(PickerKind::Day)),
             (Some('c'), true) => Some(Message::CopyAll),
             (Some('z'), false) => Some(Message::Undo),
             (Some('z'), true) => Some(Message::Redo),

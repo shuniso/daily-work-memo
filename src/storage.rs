@@ -70,6 +70,29 @@ pub fn purge_old_daily(data_dir: &Path, today: NaiveDate, retention_days: u32) -
     result
 }
 
+/// 本文がある日次ファイルの日付を、新しい順に返す。
+pub fn list_daily(data_dir: &Path) -> io::Result<Vec<NaiveDate>> {
+    let entries = match fs::read_dir(data_dir.join("daily")) {
+        Ok(entries) => entries,
+        Err(e) if e.kind() == io::ErrorKind::NotFound => return Ok(Vec::new()),
+        Err(e) => return Err(e),
+    };
+
+    let mut dates = Vec::new();
+    for entry in entries {
+        let entry = entry?;
+        let Some(date) = daily_date(&entry.file_name()) else {
+            continue;
+        };
+        let metadata = entry.metadata()?;
+        if metadata.is_file() && metadata.len() > 0 {
+            dates.push(date);
+        }
+    }
+    dates.sort_unstable_by(|a, b| b.cmp(a));
+    Ok(dates)
+}
+
 /// `YYYY-MM-DD.txt` 形式のファイル名ならその日付。
 fn daily_date(file_name: &std::ffi::OsStr) -> Option<NaiveDate> {
     let stem = file_name.to_str()?.strip_suffix(".txt")?;

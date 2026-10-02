@@ -124,6 +124,60 @@ fn entry_picker_still_inserts_header() {
     assert!(app.text().ends_with("] 作業メモ\n"), "{}", app.text());
 }
 
+#[test]
+fn day_picker_opens_past_day_and_returns_to_today() {
+    let dir = temp_dir("past");
+    let data_dir = dir.join("data");
+    let past = write_day(&data_dir, d(2026, 9, 28));
+    write_day(&data_dir, d(2026, 9, 29));
+    let mut app = App::with_paths(&dir.join("config.toml"), &data_dir, d(2026, 9, 30));
+    type_str(&mut app, "今日のメモ");
+
+    // 一覧は 今日, 09-29, 09-28 の順
+    let _ = app.update(Message::OpenPicker(PickerKind::Day));
+    let _ = app.update(Message::Choose(2));
+    assert_eq!(app.active_date(), d(2026, 9, 28));
+    assert_eq!(app.text(), "過去のメモ");
+    assert!(app.title().contains("過去のメモ"));
+    assert_eq!(
+        fs::read_to_string(daily_path(&data_dir, d(2026, 9, 30))).unwrap(),
+        "今日のメモ"
+    );
+
+    // 過去の日への編集はその日のファイルへ保存され、日付が変わっても今日へ移らない
+    type_str(&mut app, "追記");
+    app.check_date(d(2026, 10, 1));
+    assert_eq!(app.active_date(), d(2026, 9, 28));
+
+    let _ = app.update(Message::OpenPicker(PickerKind::Day));
+    let _ = app.update(Message::Choose(0));
+    assert_eq!(app.active_date(), d(2026, 10, 1));
+    assert_eq!(app.text(), "");
+    assert!(!app.title().contains("過去のメモ"));
+    assert_eq!(fs::read_to_string(&past).unwrap(), "過去のメモ追記");
+
+    // 今日へ戻った後は、また日付の切り替えに追従する
+    app.check_date(d(2026, 10, 2));
+    assert_eq!(app.active_date(), d(2026, 10, 2));
+}
+
+#[test]
+fn day_picker_does_not_switch_when_current_day_cannot_be_saved() {
+    let dir = temp_dir("past-blocked");
+    let data_dir = dir.join("data");
+    write_day(&data_dir, d(2026, 9, 29));
+    let mut app = App::with_paths(&dir.join("config.toml"), &data_dir, d(2026, 9, 30));
+    type_str(&mut app, "未保存");
+    let _ = app.update(Message::OpenPicker(PickerKind::Day));
+
+    // 一覧を出した後で、保存先ディレクトリをファイルに置き換えて書き込めなくする
+    fs::remove_dir_all(data_dir.join("daily")).unwrap();
+    fs::write(data_dir.join("daily"), "blocker").unwrap();
+    let _ = app.update(Message::Choose(1));
+    assert_eq!(app.text(), "未保存");
+    assert_eq!(app.active_date(), d(2026, 9, 30));
+}
+
 fn write_day(data_dir: &std::path::Path, date: NaiveDate) -> PathBuf {
     let path = daily_path(data_dir, date);
     fs::create_dir_all(path.parent().unwrap()).unwrap();

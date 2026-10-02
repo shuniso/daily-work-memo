@@ -1,14 +1,17 @@
-//! 作業種別・プレフィックスのセレクタのオーバーレイ。
+//! 作業種別・プレフィックス・過去メモのセレクタのオーバーレイ。
 
-use iced::widget::{button, center, column, container, mouse_area, opaque, row, text};
+use iced::widget::{button, center, column, container, mouse_area, opaque, row, scrollable, text};
 use iced::{Color, Element, Fill, border};
 
 use crate::app::Message;
 
+/// 一覧のスクロール領域の ID。
+pub const LIST_ID: &str = "picker-list";
+
 /// `items` は `(キー, 表示名)`。
-pub fn view<'a>(items: &[(&'a str, &'a str)], selected: usize) -> Element<'a, Message> {
-    let items = items.iter().enumerate().map(|(index, (key, label))| {
-        button(row![text(key.to_uppercase()).width(28), text(*label)])
+pub fn view<'a>(items: Vec<(String, String)>, selected: usize) -> Element<'a, Message> {
+    let items = items.into_iter().enumerate().map(|(index, (key, label))| {
+        button(row![text(key.to_uppercase()).width(28), text(label)])
             .width(Fill)
             .padding([6, 10])
             .style(if index == selected {
@@ -20,8 +23,9 @@ pub fn view<'a>(items: &[(&'a str, &'a str)], selected: usize) -> Element<'a, Me
             .into()
     });
 
-    let panel = container(column(items).spacing(2))
+    let panel = container(scrollable(column(items).spacing(2)).id(LIST_ID))
         .width(280)
+        .max_height(420)
         .padding(8)
         .style(|theme| {
             container::bordered_box(theme).border(
