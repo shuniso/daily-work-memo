@@ -31,6 +31,10 @@
 日次メモは UTF-8（BOMなし）・LF の `.txt` です。**30日より前の日次メモは、起動時と日付切り替え時に自動で削除されます**（ゴミ箱には入りません）。日数は config の `retention_days` で変更でき、`0` で削除しなくなります。config は初回起動時に [config.example.toml](config.example.toml) と同じ内容で生成され、変更は再起動で反映されます。本番用の `config.toml` はコミットしません（`.gitignore` 済み）。
 `data_dir` には絶対パスのみ指定できます（`~` は展開しません）。
 
+## フォント
+
+本文とセレクタは、同梱の [HackGen](https://github.com/yuru7/HackGen) Regular（v2.10.0）で表示します。別のフォントを使う場合は、config の `font_family` に OS へインストール済みのフォント名を指定します（例: `font_family = "BIZ UDGothic"`。見つからない名前を指定した場合は OS の代替フォントで表示されます）。
+
 v0.1.0（旧名 Daily Work Memo）のメモ・config は `daily-work-memo` フォルダにあります。引き継ぐ場合は、新しい版を起動する前にフォルダ名を `tsuratsura` に変えてください（macOS: `~/Library/Application Support/daily-work-memo`、Windows: `%APPDATA%\daily-work-memo`）。
 
 ## 開発
@@ -57,6 +61,7 @@ cargo run --release --example spike -- 10000   # Phase 0 spike
 - **全文コピー失敗は通知しない**: Iced のクリップボード書き込みは成否を返さないため検出できない。
 - **プレフィックス挿入（`Primary+L`）を追加**: `<action item> ` `<remind> ` `<重要> ` などの目印を、カーソルがある行の先頭（インデントの後ろ）へ挿入する。カーソルは元の文字の位置に留まる。config の `[[prefixes]]`（`text` と `key`）で変更でき、`prefixes = []` で無効。これに伴い、作業種別の既定から「リマインド」「アクションアイテム」を外した（既存の config.toml はそのまま）。
 - **過去のメモを開く（`Primary+E`）を追加**: 本文がある日次メモの一覧（今日が先頭、以降は新しい順）から選んで開く。開いた日はそのまま編集でき、その日のファイルへ自動保存される。過去の日を開いている間は上部に日付を出し、日付が変わっても今日へ切り替えない。今日へは同じ一覧から戻る。
+- **フォントを同梱**: OS 既定のフォントでは Windows で日本語の見た目が揃わないため、HackGen Regular を実行ファイルに埋め込んで既定にした（バイナリが約 10.7 MB、RSS が約 20〜27 MB 増える。[docs/PERFORMANCE.md](docs/PERFORMANCE.md)）。config の `font_family` で本文だけ別のフォントに変えられる。
 - **Esc でエディタのフォーカスを外さない**: Iced 既定では Esc でフォーカスが外れ入力できなくなるため無効化。
 - **`font_size` を 8〜72 に制限**、**未知の config キーはエラー**（typo の見落とし防止）。config エラー時も、有効な絶対パスの `data_dir` だけは引き継ぐ（メモの保存先が分かれるのを防ぐ）。
 - **貼り付け・IME確定の CR は LF へ正規化**して挿入する。
@@ -73,3 +78,5 @@ cargo run --release --example spike -- 10000   # Phase 0 spike
 ## ライセンス
 
 [MIT](LICENSE)
+
+同梱フォント HackGen は [SIL Open Font License 1.1](assets/fonts/LICENSE-HackGen.txt) です（Copyright (c) 2019, Yuko OTAWARA）。無改変で実行ファイルに埋め込んでいます。

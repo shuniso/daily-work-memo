@@ -23,6 +23,8 @@ const FONT_SIZE_RANGE: std::ops::RangeInclusive<u16> = 8..=72;
 pub struct Config {
     /// 空ならOS標準のアプリデータディレクトリ。指定する場合は絶対パスのみ。
     pub data_dir: String,
+    /// 本文に使うインストール済みフォントのファミリー名。空なら同梱フォント。
+    pub font_family: String,
     pub font_size: u16,
     pub autosave_debounce_ms: u64,
     /// 日次メモを残す日数。0 なら削除しない。
@@ -48,6 +50,7 @@ impl Default for Config {
 
         Self {
             data_dir: String::new(),
+            font_family: String::new(),
             font_size: 15,
             autosave_debounce_ms: 250,
             retention_days: 30,

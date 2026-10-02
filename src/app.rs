@@ -48,6 +48,8 @@ pub struct App {
     saver: Option<saver::Handle>,
     /// 日次ファイルを読めなかった。上書きを防ぐため保存しない。
     load_failed: bool,
+    /// config で指定された本文フォント。`None` なら同梱フォント。
+    editor_font: Option<iced::Font>,
     config_error: Option<String>,
     load_error: Option<String>,
     save_error: Option<String>,
@@ -96,6 +98,12 @@ impl App {
             eprintln!("[{APP_ID}] {} ({e})", config_path.display());
         }
         let data_dir = config.resolve_data_dir(default_data_dir);
+        // Font は 'static な名前を要求する。config は起動時に一度しか読まないのでリークさせる
+        let editor_font = (!config.font_family.trim().is_empty()).then(|| {
+            iced::Font::with_name(Box::leak(
+                config.font_family.trim().to_owned().into_boxed_str(),
+            ))
+        });
         let active_date = today;
 
         let mut app = Self {
@@ -113,6 +121,7 @@ impl App {
             saved_rev: 0,
             saver: None,
             load_failed: false,
+            editor_font,
             config_error: config_error
                 .map(|e| format!("{e}（内蔵デフォルトで起動中: {}）", config_path.display())),
             load_error: None,
@@ -525,7 +534,7 @@ impl App {
     }
 
     pub fn view(&self) -> Element<'_, Message> {
-        let editor = iced::widget::text_editor(&self.content)
+        let mut editor = iced::widget::text_editor(&self.content)
             .id(EDITOR_ID)
             .on_action(Message::Edit)
             .key_binding(key_binding)
@@ -537,6 +546,9 @@ impl App {
                 border: iced::Border::default(),
                 ..text_editor::default(theme, status)
             });
+        if let Some(font) = self.editor_font {
+            editor = editor.font(font);
+        }
 
         // ピッカーや通知の有無でウィジェット構造を変えない（エディタのフォーカスを保つ）
         let mut body = stack![editor];

@@ -10,6 +10,10 @@ pub mod saver;
 pub mod storage;
 pub mod ui;
 
+/// 同梱フォント（HackGen Regular、SIL OFL 1.1。`assets/fonts/LICENSE-HackGen.txt`）。
+const FONT_BYTES: &[u8] = include_bytes!("../assets/fonts/HackGen-Regular.ttf");
+const FONT_FAMILY: &str = "HackGen";
+
 pub fn run() -> iced::Result {
     let (config_path, _) = config::paths();
     let lock_path = config_path.with_file_name("instance.lock");
@@ -33,6 +37,8 @@ pub fn run() -> iced::Result {
     iced::application(app::App::new, app::App::update, app::App::view)
         .title(app::App::title)
         .subscription(app::App::subscription)
+        .font(FONT_BYTES)
+        .default_font(iced::Font::with_name(FONT_FAMILY))
         .exit_on_close_request(false)
         .window_size((720.0, 640.0))
         .run()

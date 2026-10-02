@@ -26,11 +26,12 @@ fn default_toml_matches_builtin_default() {
 #[test]
 fn parses_custom_config() {
     let source = format!(
-        "font_size = 18\nautosave_debounce_ms = 500\nentry_header = \"## {{label}} {{time}}\"\n{}template = \"- [ ] \"\n",
+        "font_family = \"BIZ UDGothic\"\nfont_size = 18\nautosave_debounce_ms = 500\nentry_header = \"## {{label}} {{time}}\"\n{}template = \"- [ ] \"\n",
         entry("action", "やること", "a")
     );
     let config = Config::parse(&source).unwrap();
     assert_eq!(config.font_size, 18);
+    assert_eq!(config.font_family, "BIZ UDGothic");
     assert_eq!(config.autosave_debounce_ms, 500);
     assert_eq!(config.entry_header, "## {label} {time}");
     assert_eq!(config.entry_types[0].template, "- [ ] ");
@@ -40,6 +41,7 @@ fn parses_custom_config() {
 fn omitted_fields_use_defaults() {
     let config = Config::parse("font_size = 20\n").unwrap();
     assert_eq!(config.font_size, 20);
+    assert_eq!(config.font_family, "");
     assert_eq!(config.retention_days, 30);
     assert_eq!(config.entry_types, Config::default().entry_types);
     assert_eq!(config.prefixes, Config::default().prefixes);
