@@ -259,7 +259,7 @@ fn pin_starts_from_config_and_toggles() {
 }
 
 #[test]
-fn collapse_keeps_text_and_expands_on_focus_or_enter() {
+fn collapse_keeps_text_and_expands_only_on_request() {
     let dir = temp_dir("collapse");
     let mut app = App::with_paths(&dir.join("config.toml"), &dir.join("data"), d(2026, 9, 30));
     assert!(!app.is_pinned());
@@ -277,11 +277,16 @@ fn collapse_keeps_text_and_expands_on_focus_or_enter() {
     );
     assert!(!app.is_collapsed());
 
-    let _ = app.update(Message::Collapse(Size::new(720.0, 640.0)));
+    // フォーカスの出入りでは畳みも開きもしない
+    let _ = app.update(Message::TogglePin);
+    let _ = app.update(Message::WindowUnfocused);
     let _ = app.update(Message::WindowFocused);
     assert!(!app.is_collapsed());
+    let _ = app.update(Message::Collapse(Size::new(720.0, 640.0)));
+    let _ = app.update(Message::WindowUnfocused);
+    let _ = app.update(Message::WindowFocused);
+    assert!(app.is_collapsed());
 
-    // 展開済みへの Expand は何もしない（フォーカス復帰とクリックが重なっても畳み直さない）
     let _ = app.update(Message::Expand);
     assert!(!app.is_collapsed());
 
@@ -302,7 +307,7 @@ fn collapse_keeps_text_and_expands_on_focus_or_enter() {
 }
 
 #[test]
-fn closing_collapsed_window_with_unsaved_text_expands_to_show_warning() {
+fn closing_collapsed_window_with_unsaved_text_keeps_it_open() {
     let dir = temp_dir("collapse-close");
     let data_dir = dir.join("data");
     let mut app = App::with_paths(&dir.join("config.toml"), &data_dir, d(2026, 9, 30));
@@ -314,6 +319,6 @@ fn closing_collapsed_window_with_unsaved_text_expands_to_show_warning() {
     fs::write(data_dir.join("daily"), "blocker").unwrap();
     let _ = app.update(Message::CloseRequested(window::Id::unique()));
 
-    assert!(!app.is_collapsed());
+    assert!(app.is_collapsed());
     assert_eq!(app.text(), "未保存");
 }

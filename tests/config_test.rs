@@ -44,7 +44,6 @@ fn omitted_fields_use_defaults() {
     assert_eq!(config.font_family, "");
     assert_eq!(config.retention_days, 30);
     assert!(!config.always_on_top);
-    assert!(config.auto_collapse);
     assert_eq!(config.entry_types, Config::default().entry_types);
     assert_eq!(config.prefixes, Config::default().prefixes);
 }
@@ -206,8 +205,10 @@ fn load_invalid_config_keeps_valid_data_dir() {
 }
 
 #[test]
-fn parses_window_options() {
-    let config = Config::parse("always_on_top = true\nauto_collapse = false\n").unwrap();
-    assert!(config.always_on_top);
-    assert!(!config.auto_collapse);
+fn parses_always_on_top() {
+    assert!(
+        Config::parse("always_on_top = true\n")
+            .unwrap()
+            .always_on_top
+    );
 }

@@ -278,18 +278,9 @@ impl App {
                     self.flush();
                 }
             }
-            Message::Flush => self.flush(),
+            Message::Flush | Message::WindowUnfocused => self.flush(),
             Message::WindowOpened => return self.apply_level(),
-            Message::WindowUnfocused => {
-                self.flush();
-                if self.pinned && self.config.auto_collapse && !self.collapsed {
-                    return request_collapse();
-                }
-            }
-            Message::WindowFocused => {
-                self.check_date(date::today());
-                return self.expand();
-            }
+            Message::WindowFocused => self.check_date(date::today()),
             Message::CloseRequested(id) => return self.close_requested(id),
             Message::Saver(event) => self.saver_event(event),
         }
@@ -626,9 +617,8 @@ impl App {
             return window::close(id).chain(iced::exit());
         }
 
-        // 警告は折り畳んだままだと読めない
         self.close_armed = true;
-        self.expand()
+        Task::none()
     }
 
     fn has_notice(&self) -> bool {
