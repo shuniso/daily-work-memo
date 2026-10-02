@@ -48,6 +48,8 @@ cargo build --release
 cargo run --release --example spike -- 10000   # Phase 0 spike
 ```
 
+Windows の `cargo build --release` では、`assets/app-icon.ico` を実行ファイルに埋め込みます（Windows SDK のリソースコンパイラーが必要）。起動中のウィンドウにも同じ絵柄のアイコンを設定します。更新後もピン留めしたアイコンが古い場合は、ピン留めを外し、新しい実行ファイルを起動して再度ピン留めしてください。
+
 ## Phase 0 Go / No-Go
 
 **Go（条件付き）** — macOS で起動 0.3 s（warm）、アイドル CPU 0.1〜0.2 %、通常サイズで RSS 約 89 MB（Apple M3 ネイティブ。Rosetta 実行時は約 45 MB）、日本語 IME 入力も動作。

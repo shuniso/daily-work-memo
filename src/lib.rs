@@ -39,6 +39,7 @@ pub fn run() -> iced::Result {
         .subscription(app::App::subscription)
         .font(FONT_BYTES)
         .default_font(iced::Font::with_name(FONT_FAMILY))
+        .window(window_settings())
         .exit_on_close_request(false)
         .window_size((720.0, 640.0))
         .run()
@@ -54,8 +55,28 @@ fn show_already_running() -> iced::Result {
 
     iced::application(|| (), |_: &mut (), _: ()| {}, view)
         .title(|_: &()| "つらつら".to_owned())
+        .window(window_settings())
         .window_size((360.0, 100.0))
         .run()
+}
+
+/// 通常起動・多重起動の通知で共通のウィンドウアイコンを使う。
+fn window_settings() -> iced::window::Settings {
+    let image = image::load_from_memory_with_format(
+        include_bytes!("../assets/window-icon.png"),
+        image::ImageFormat::Png,
+    )
+    .expect("同梱のウィンドウアイコンを読み込めません")
+    .into_rgba8();
+    let (width, height) = image.dimensions();
+
+    iced::window::Settings {
+        icon: Some(
+            iced::window::icon::from_rgba(image.into_raw(), width, height)
+                .expect("同梱のウィンドウアイコンが不正です"),
+        ),
+        ..Default::default()
+    }
 }
 
 /// macOS の標準メニューの Quit (Cmd+Q) は close request を経ずにプロセスを終了する。
@@ -68,5 +89,14 @@ fn wait_for_saves_at_exit() {
     // SAFETY: 引数も戻り値もない extern "C" 関数を登録するだけ。
     unsafe {
         libc::atexit(on_exit);
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    #[test]
+    fn bundled_window_icon_is_valid() {
+        // 画像の破損や形式の変更で起動時に失敗しないことを確認する。
+        assert!(super::window_settings().icon.is_some());
     }
 }
