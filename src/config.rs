@@ -26,6 +26,10 @@ pub struct Config {
     /// 本文に使うインストール済みフォントのファミリー名。空なら同梱フォント。
     pub font_family: String,
     pub font_size: u16,
+    /// 起動時にウィンドウを最前面へ固定する。
+    pub always_on_top: bool,
+    /// 最前面に固定している間、フォーカスを失ったら折り畳む。
+    pub auto_collapse: bool,
     pub autosave_debounce_ms: u64,
     /// 日次メモを残す日数。0 なら削除しない。
     pub retention_days: u32,
@@ -52,6 +56,8 @@ impl Default for Config {
             data_dir: String::new(),
             font_family: String::new(),
             font_size: 15,
+            always_on_top: false,
+            auto_collapse: true,
             autosave_debounce_ms: 250,
             retention_days: 30,
             entry_header: "[{time}] {label}".into(),

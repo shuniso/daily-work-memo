@@ -2,7 +2,9 @@ use std::fs;
 use std::path::PathBuf;
 
 use chrono::NaiveDate;
+use iced::keyboard::{Key, Modifiers, key};
 use iced::widget::text_editor::{Action, Edit};
+use iced::{Size, window};
 
 use tsuratsura::app::{App, Message, PickerKind};
 use tsuratsura::storage::daily_path;
@@ -227,4 +229,91 @@ fn nothing_is_purged_when_config_is_invalid() {
     let _app = App::with_paths(&dir.join("config.toml"), &data_dir, d(2026, 9, 30));
 
     assert!(old.exists());
+}
+
+fn press(app: &mut App, key: Key, code: key::Code, modifiers: Modifiers) {
+    let _ = app.update(Message::KeyPressed(
+        key,
+        key::Physical::Code(code),
+        modifiers,
+    ));
+}
+
+#[test]
+fn pin_starts_from_config_and_toggles() {
+    let dir = temp_dir("pin");
+    fs::write(dir.join("config.toml"), "always_on_top = true\n").unwrap();
+    let mut app = App::with_paths(&dir.join("config.toml"), &dir.join("data"), d(2026, 9, 30));
+    assert!(app.is_pinned());
+
+    let _ = app.update(Message::TogglePin);
+    assert!(!app.is_pinned());
+
+    press(
+        &mut app,
+        Key::Character("T".into()),
+        key::Code::KeyT,
+        Modifiers::COMMAND | Modifiers::SHIFT,
+    );
+    assert!(app.is_pinned());
+}
+
+#[test]
+fn collapse_keeps_text_and_expands_on_focus_or_enter() {
+    let dir = temp_dir("collapse");
+    let mut app = App::with_paths(&dir.join("config.toml"), &dir.join("data"), d(2026, 9, 30));
+    assert!(!app.is_pinned());
+    type_str(&mut app, "書きかけ");
+
+    let _ = app.update(Message::Collapse(Size::new(720.0, 640.0)));
+    assert!(app.is_collapsed());
+    assert_eq!(app.text(), "書きかけ");
+
+    press(
+        &mut app,
+        Key::Named(key::Named::Enter),
+        key::Code::Enter,
+        Modifiers::empty(),
+    );
+    assert!(!app.is_collapsed());
+
+    let _ = app.update(Message::Collapse(Size::new(720.0, 640.0)));
+    let _ = app.update(Message::WindowFocused);
+    assert!(!app.is_collapsed());
+
+    // 展開済みへの Expand は何もしない（フォーカス復帰とクリックが重なっても畳み直さない）
+    let _ = app.update(Message::Expand);
+    assert!(!app.is_collapsed());
+
+    press(
+        &mut app,
+        Key::Character("m".into()),
+        key::Code::KeyM,
+        Modifiers::COMMAND | Modifiers::SHIFT,
+    );
+    let _ = app.update(Message::Collapse(Size::new(720.0, 640.0)));
+    press(
+        &mut app,
+        Key::Character("m".into()),
+        key::Code::KeyM,
+        Modifiers::COMMAND | Modifiers::SHIFT,
+    );
+    assert!(!app.is_collapsed());
+}
+
+#[test]
+fn closing_collapsed_window_with_unsaved_text_expands_to_show_warning() {
+    let dir = temp_dir("collapse-close");
+    let data_dir = dir.join("data");
+    let mut app = App::with_paths(&dir.join("config.toml"), &data_dir, d(2026, 9, 30));
+    type_str(&mut app, "未保存");
+    let _ = app.update(Message::Collapse(Size::new(720.0, 640.0)));
+
+    // 保存先ディレクトリをファイルに置き換えて書き込めなくする
+    fs::remove_dir_all(data_dir.join("daily")).unwrap();
+    fs::write(data_dir.join("daily"), "blocker").unwrap();
+    let _ = app.update(Message::CloseRequested(window::Id::unique()));
+
+    assert!(!app.is_collapsed());
+    assert_eq!(app.text(), "未保存");
 }

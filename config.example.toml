@@ -4,6 +4,10 @@ data_dir = ""
 # 本文のフォント。空なら同梱の HackGen。OS にインストール済みのフォント名（例: "BIZ UDGothic"）も指定できる。
 font_family = ""
 font_size = 15
+# 起動時にウィンドウを最前面へ固定する。起動後はボタンか Primary+Shift+T で切り替える。
+always_on_top = false
+# 最前面に固定している間、ほかのアプリへ移ったら小さなバーへ折り畳む。
+auto_collapse = true
 autosave_debounce_ms = 250
 # 日次メモを残す日数。これより古い日次メモは起動時・日付切り替え時に削除する。0 で削除しない。
 retention_days = 30

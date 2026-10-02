@@ -9,14 +9,17 @@ use iced::event::{self, Event};
 use iced::keyboard::{self, Key, key};
 use iced::widget::scrollable::RelativeOffset;
 use iced::widget::text_editor::{self, Binding, KeyPress, Status};
-use iced::widget::{column, container, operation, stack, text};
-use iced::{Color, Element, Fill, Subscription, Task, window};
+use iced::widget::{button, column, container, mouse_area, operation, row, space, stack, text};
+use iced::{Color, Element, Fill, Size, Subscription, Task, window};
 
 use crate::config::{self, APP_ID, Config};
 use crate::editor::{self, History};
 use crate::{date, entry, saver, storage, ui};
 
 const EDITOR_ID: &str = "editor";
+
+/// 折り畳んだ時のウィンドウの内寸。
+const BAR_SIZE: Size = Size::new(260.0, 28.0);
 
 /// セレクタの種類。
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -57,6 +60,12 @@ pub struct App {
     close_armed: bool,
     /// Primary キーを押している。
     primary_held: bool,
+    /// ウィンドウを最前面に固定している。
+    pinned: bool,
+    /// 小さなバーへ折り畳んでいる。
+    collapsed: bool,
+    /// 折り畳む前のウィンドウの内寸。展開時に戻す。
+    expanded_size: Size,
 }
 
 #[derive(Debug, Clone)]
@@ -65,12 +74,19 @@ pub enum Message {
     OpenPicker(PickerKind),
     ClosePicker,
     Choose(usize),
-    PickerKey(Key, keyboard::key::Physical, keyboard::Modifiers),
+    /// どのウィジェットも処理しなかったキー入力。
+    KeyPressed(Key, keyboard::key::Physical, keyboard::Modifiers),
+    TogglePin,
+    ToggleCollapse,
+    /// 現在の内寸を覚えて折り畳む。
+    Collapse(Size),
+    Expand,
     Undo,
     Redo,
     CopyAll,
     Flush,
     ModifiersChanged(keyboard::Modifiers),
+    WindowOpened,
     WindowFocused,
     WindowUnfocused,
     CloseRequested(window::Id),
@@ -105,6 +121,7 @@ impl App {
             ))
         });
         let active_date = today;
+        let pinned = config.always_on_top;
 
         let mut app = Self {
             config,
@@ -128,6 +145,9 @@ impl App {
             save_error: None,
             close_armed: false,
             primary_held: false,
+            pinned,
+            collapsed: false,
+            expanded_size: Size::ZERO,
         };
         app.open_day(active_date);
         app.purge_old_days();
@@ -150,6 +170,14 @@ impl App {
         } else {
             format!("つらつら — {date}")
         }
+    }
+
+    pub fn is_pinned(&self) -> bool {
+        self.pinned
+    }
+
+    pub fn is_collapsed(&self) -> bool {
+        self.collapsed
     }
 
     fn is_dirty(&self) -> bool {
@@ -198,9 +226,37 @@ impl App {
                 return operation::focus(EDITOR_ID);
             }
             Message::Choose(index) => return self.choose(index),
-            Message::PickerKey(key, physical, modifiers) => {
+            Message::KeyPressed(key, physical, modifiers) => {
+                if let Some(message) = window_shortcut(&key, physical, modifiers) {
+                    return self.update(message);
+                }
+                if self.collapsed {
+                    if key == Key::Named(key::Named::Enter) {
+                        return self.expand();
+                    }
+                    return Task::none();
+                }
                 return self.picker_key(key, physical, modifiers);
             }
+            Message::TogglePin => {
+                self.pinned = !self.pinned;
+                let level = self.apply_level();
+                // ボタンを押すとエディタのフォーカスが外れるので戻す
+                return if self.picker.is_none() {
+                    Task::batch([level, operation::focus(EDITOR_ID)])
+                } else {
+                    level
+                };
+            }
+            Message::ToggleCollapse => {
+                return if self.collapsed {
+                    self.expand()
+                } else {
+                    request_collapse()
+                };
+            }
+            Message::Collapse(size) => return self.collapse(size),
+            Message::Expand => return self.expand(),
             Message::Undo => {
                 if let Some(content) = self.history.undo(&self.content) {
                     self.content = content;
@@ -222,8 +278,18 @@ impl App {
                     self.flush();
                 }
             }
-            Message::Flush | Message::WindowUnfocused => self.flush(),
-            Message::WindowFocused => self.check_date(date::today()),
+            Message::Flush => self.flush(),
+            Message::WindowOpened => return self.apply_level(),
+            Message::WindowUnfocused => {
+                self.flush();
+                if self.pinned && self.config.auto_collapse && !self.collapsed {
+                    return request_collapse();
+                }
+            }
+            Message::WindowFocused => {
+                self.check_date(date::today());
+                return self.expand();
+            }
             Message::CloseRequested(id) => return self.close_requested(id),
             Message::Saver(event) => self.saver_event(event),
         }
@@ -240,6 +306,37 @@ impl App {
         } else if let (Some(saver), false) = (&self.saver, self.load_failed) {
             saver.touch(self.debounce());
         }
+    }
+
+    fn apply_level(&self) -> Task<Message> {
+        let level = if self.pinned {
+            window::Level::AlwaysOnTop
+        } else {
+            window::Level::Normal
+        };
+        window::latest().and_then(move |id| window::set_level(id, level))
+    }
+
+    fn collapse(&mut self, size: Size) -> Task<Message> {
+        if self.collapsed {
+            return Task::none();
+        }
+        self.collapsed = true;
+        self.expanded_size = size;
+        self.picker = None;
+        window::latest().and_then(|id| window::resize(id, BAR_SIZE))
+    }
+
+    fn expand(&mut self) -> Task<Message> {
+        if !self.collapsed {
+            return Task::none();
+        }
+        self.collapsed = false;
+        let size = self.expanded_size;
+        Task::batch([
+            window::latest().and_then(move |id| window::resize(id, size)),
+            operation::focus(EDITOR_ID),
+        ])
     }
 
     /// セレクタの `(キー, 表示名)`。
@@ -529,11 +626,60 @@ impl App {
             return window::close(id).chain(iced::exit());
         }
 
+        // 警告は折り畳んだままだと読めない
         self.close_armed = true;
-        Task::none()
+        self.expand()
+    }
+
+    fn has_notice(&self) -> bool {
+        self.config_error.is_some()
+            || self.load_error.is_some()
+            || self.save_error.is_some()
+            || self.close_armed
+    }
+
+    /// 折り畳んでいる間の表示。押すと展開する。
+    fn bar(&self) -> Element<'_, Message> {
+        let has_notice = self.has_notice();
+        let label = if has_notice {
+            "要確認 — クリックで開く"
+        } else {
+            "クリックで開く"
+        };
+
+        mouse_area(
+            container(text(label).size(13))
+                .center(Fill)
+                .style(move |_| notice_style(has_notice)),
+        )
+        .on_press(Message::Expand)
+        .interaction(iced::mouse::Interaction::Pointer)
+        .into()
     }
 
     pub fn view(&self) -> Element<'_, Message> {
+        if self.collapsed {
+            return self.bar();
+        }
+
+        let toolbar = row![
+            space::horizontal(),
+            button(text("最前面に固定").size(12))
+                .padding([2, 8])
+                .style(if self.pinned {
+                    button::primary
+                } else {
+                    button::text
+                })
+                .on_press(Message::TogglePin),
+            button(text("折り畳む").size(12))
+                .padding([2, 8])
+                .style(button::text)
+                .on_press(Message::ToggleCollapse),
+        ]
+        .spacing(4)
+        .padding([4, 8]);
+
         let mut editor = iced::widget::text_editor(&self.content)
             .id(EDITOR_ID)
             .on_action(Message::Edit)
@@ -587,9 +733,10 @@ impl App {
                 .size(13),
             );
         }
-        let has_notice = messages.iter().any(|m| m.is_some()) || self.close_armed;
+        let has_notice = self.has_notice();
 
         column![
+            toolbar,
             container(past)
                 .width(Fill)
                 .padding(if viewing_past { [6, 12] } else { [0, 0] })
@@ -608,17 +755,7 @@ impl App {
             container(notices)
                 .width(Fill)
                 .padding(if has_notice { [8, 12] } else { [0, 0] })
-                .style(move |_| {
-                    if has_notice {
-                        container::Style {
-                            background: Some(Color::from_rgb8(0xFD, 0xEC, 0xEC).into()),
-                            text_color: Some(Color::from_rgb8(0x9B, 0x1C, 0x1C)),
-                            ..container::Style::default()
-                        }
-                    } else {
-                        container::Style::default()
-                    }
-                })
+                .style(move |_| notice_style(has_notice))
         ]
         .into()
     }
@@ -632,8 +769,51 @@ impl App {
     }
 }
 
+/// 通知がある時の背景と文字色。
+fn notice_style(has_notice: bool) -> container::Style {
+    if has_notice {
+        container::Style {
+            background: Some(Color::from_rgb8(0xFD, 0xEC, 0xEC).into()),
+            text_color: Some(Color::from_rgb8(0x9B, 0x1C, 0x1C)),
+            ..container::Style::default()
+        }
+    } else {
+        container::Style::default()
+    }
+}
+
+/// いまの内寸を調べてから折り畳む。フルスクリーン中は折り畳まない。
+fn request_collapse() -> Task<Message> {
+    window::latest().and_then(|id| {
+        window::mode(id).then(move |mode| {
+            if mode == window::Mode::Fullscreen {
+                Task::none()
+            } else {
+                window::size(id).map(Message::Collapse)
+            }
+        })
+    })
+}
+
+/// 最前面固定・折り畳みのショートカット。
+fn window_shortcut(
+    key: &Key,
+    physical: keyboard::key::Physical,
+    modifiers: keyboard::Modifiers,
+) -> Option<Message> {
+    if !modifiers.command() || !modifiers.shift() {
+        return None;
+    }
+    match key.to_latin(physical)?.to_ascii_lowercase() {
+        't' => Some(Message::TogglePin),
+        'm' => Some(Message::ToggleCollapse),
+        _ => None,
+    }
+}
+
 fn runtime_event(event: Event, status: event::Status, _window: window::Id) -> Option<Message> {
     match event {
+        Event::Window(window::Event::Opened { .. }) => Some(Message::WindowOpened),
         Event::Window(window::Event::Focused) => Some(Message::WindowFocused),
         Event::Window(window::Event::Unfocused) => Some(Message::WindowUnfocused),
         Event::Keyboard(keyboard::Event::ModifiersChanged(modifiers)) => {
@@ -645,7 +825,7 @@ fn runtime_event(event: Event, status: event::Status, _window: window::Id) -> Op
             modifiers,
             ..
         }) if status == event::Status::Ignored => {
-            Some(Message::PickerKey(key, physical_key, modifiers))
+            Some(Message::KeyPressed(key, physical_key, modifiers))
         }
         _ => None,
     }
@@ -669,6 +849,9 @@ fn key_binding(press: KeyPress) -> Option<Binding<Message>> {
     }
 
     let modifiers = press.modifiers;
+    if let Some(message) = window_shortcut(&press.key, press.physical_key, modifiers) {
+        return Some(Binding::Custom(message));
+    }
     if modifiers.command() {
         let custom = match (press.key.to_latin(press.physical_key), modifiers.shift()) {
             (Some('k'), false) => Some(Message::OpenPicker(PickerKind::Entry)),
